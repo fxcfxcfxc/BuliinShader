@@ -34,5 +34,5 @@ Material:
     - _Opacity: 1
     - _WrapInt: 1
     m_Colors:
-    - _MainColor: {r: 0.4520234, g: 1, b: 0.41194963, a: 1}
+    - _MainColor: {r: 0.93141735, g: 2.6390157, b: 0.8175774, a: 1}
   m_BuildTextureStacks: []

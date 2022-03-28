@@ -3,7 +3,7 @@ Shader "Unlit/uvFlow"
     Properties
     {
         _MainTex("RGB:颜色 A：透贴", 2D) = "gray" {}
-        _MainColor("颜色倾向",color)=(1.0,1.0,1.0,1.0)
+        [hdr]_MainColor("颜色倾向",color)=(1.0,1.0,1.0,1.0)
         _Opacity("透明度",range(0.0,1.0))=0.5
         _NoiseTex("噪波图",2D)="gray"{}
         _NoiseInt("噪波强度",range(0.0,5.0))=0.5
