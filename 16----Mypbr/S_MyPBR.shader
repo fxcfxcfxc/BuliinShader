@@ -22,11 +22,15 @@ Shader "PBR/FXCPBR"
     }
     SubShader
     {
-        //--------公用数据(路径 函数)
+        //=========================================包含库
         CGINCLUDE
+        
             #include "UnityCG.cginc"
             #include "UnityLightingCommon.cginc"
+            #include "AutoLight.cginc"
 
+
+        //=======================================自定义函数
         float NDF(float nDoth ,float rough)
         {
             float a = rough * rough;
@@ -69,7 +73,7 @@ Shader "PBR/FXCPBR"
             
         }
 
-        float3 PBR(float3 pos, float3 normal, float3 albedo, float rough, float metal, float ao, float shadow, float3 indirectLight)
+        float3 PBR(float3 pos, float3 normal, float3 albedo, float rough, float metal, float ao, float shadow)
         {
 
             //-------------数据准备
@@ -120,73 +124,128 @@ Shader "PBR/FXCPBR"
             specularEnvCol *= F * surfaceReduction;
             float3 indirectLight2 = (kd * diffuseEnvCol + specularEnvCol) * ao;
 
-            
+            /*
             #if defined(LIGHTMAP_ON)
                 #if defined(SHADOWS_SHADOWMASK)
                 //return indirectLight2;
                     return (directLightResult + indirectLight2 ) * shadow + indirectLight;
                 #endif
             #endif
-
-            return directLightResult * shadow + indirectLight2;
             
+             */
+            return directLightResult * shadow + indirectLight2;
+
             
         }
 
         ENDCG
-        
-        
-
   
-            //--------------------shadow
-
-        UsePass "Legacy Shaders/VertexLit/SHADOWCASTER"
         
         
-                        
-        Pass  
-        {  
-            Name "Meta"
-            Tags {"LightMode" = "Meta"}
-            Cull Off
-         
+        //===================================pass 0 =================================
+        Pass
+        {   
+            
+            //-------------------------------设置pass tags
+            Tags 
+            { 
+                "RenderType" = "Opaque" 
+                "LightMode" = "ForwardBase"
+            }
+            
+            
             CGPROGRAM
-            #pragma vertex vert_meta
-            #pragma fragment frag_meta
-         
-            #include "Lighting.cginc"
-            #include "UnityMetaPass.cginc"
-         
+            
+            #pragma multi_compile_fwdbase_fullshadows
+            #pragma vertex vert
+            #pragma fragment frag
+
+
+
+            sampler2D _MainTex;
+            float4 _MainTex_ST;
+            uniform float4 _Color;
+            sampler2D _RoughnessTex,_MetalTex,_NormalTex;
+            float _Roughness,_Metal,_NormalStrength;
+            //float _NormalInvertG;
+            //float _RoughnessInvert;
+            sampler2D _AoTex;
+
+
+
+            
+  
+            //------------------------verticesOut ——》 vertex IN
+            struct appdata
+            {
+                float4 vertex : POSITION;
+                float2 uv : TEXCOORD0;
+                float3 normal:NORMAL;
+                float4 tangent :TANGENT;
+            };
+
+
+
+            //---------------------vertexOut -> fragmentIn
             struct v2f
             {
-                float4 pos:SV_POSITION;
-                float2 uv:TEXCOORD1;
-                float3 worldPos:TEXCOORD0;
+                float4 pos : SV_POSITION;
+                float2 uv : TEXCOORD0;
+                float4 posWS : TEXCOORD1;
+                float3 normalWS: TEXCOORD2;
+                float4 tangentWS: TEXCOORD3;
+                LIGHTING_COORDS(5,6)
             };
-         
-            uniform fixed4 _Color;
-            uniform sampler2D _MainTex;
-            v2f vert_meta(appdata_full v)
+            
+
+            //---------------vertex
+            v2f vert (appdata v)
             {
                 v2f o;
-                UNITY_INITIALIZE_OUTPUT(v2f,o);
-                o.pos = UnityMetaVertexPosition(v.vertex,v.texcoord1.xy,v.texcoord2.xy,unity_LightmapST,unity_DynamicLightmapST);
-                o.uv = v.texcoord.xy;
+                o.pos = UnityObjectToClipPos(v.vertex);
+                o.uv  = TRANSFORM_TEX(v.uv,_MainTex);
+                o.posWS = mul(unity_ObjectToWorld,v.vertex);
+                o.normalWS = UnityObjectToWorldNormal(v.normal);
+                o.tangentWS = float4(UnityObjectToWorldDir(v.tangent.xyz),v.tangent.w);
+                //根据该pass处理的光源类型（ spot 或 point 或 directional ）来计算光源坐标的具体值
+                TRANSFER_VERTEX_TO_FRAGMENT(o)
                 return o;
             }
-         
-            fixed4 frag_meta(v2f IN):SV_Target
-            {
-                 UnityMetaInput metaIN;
-                 UNITY_INITIALIZE_OUTPUT(UnityMetaInput,metaIN);
-                 metaIN.Albedo = tex2D(_MainTex,IN.uv).rgb * _Color.rgb;
-                 metaIN.Emission = 0;
-                 return UnityMetaFragment(metaIN);
-            }
-         
-            ENDCG
-        }
-   
 
+            
+            //---------------fragment
+            fixed4 frag (v2f i) : SV_Target
+            {
+                //数据准备
+                float3 normalWS = normalize(i.normalWS);
+                //unity_WorldTransformParams?
+                float3 binormalWS = cross(i.normalWS,i.tangentWS.xyz) * (i.tangentWS.w * unity_WorldTransformParams.w);
+
+                float3 albedo = tex2D(_MainTex,i.uv) * _Color;
+                float roughness = tex2D(_RoughnessTex,i.uv) * _Roughness;
+                float metal = tex2D(_MetalTex,i.uv) * _Metal;
+                float ao = tex2D(_AoTex,i.uv);
+
+                float shadowAtten = LIGHT_ATTENUATION(i);
+                
+                float3 pbrCol = PBR(i.posWS,normalWS,albedo,roughness,metal,ao,shadowAtten);
+                
+
+
+                
+                return float4(pbrCol,1);
+            }
+            ENDCG
+            
+            
+            
+            
+            
+        }
+
+        
+
+        //-----shadow PASS
+        UsePass "Legacy Shaders/VertexLit/SHADOWCASTER"
     }
 }
