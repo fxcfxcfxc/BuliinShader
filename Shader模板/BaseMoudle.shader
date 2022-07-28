@@ -36,7 +36,7 @@ Shader "Unlit/fxc/frame"
         
         Pass
         {
-            
+                
             Name  "MainPass"
             Tags
             {   
@@ -45,11 +45,10 @@ Shader "Unlit/fxc/frame"
                 " LightMode" = "ForwardBase"
                 
             }
-            
+            zwrite on
+            cull back
             
             CGPROGRAM
-
-            
             //定义顶点着色器函数 vert
             #pragma vertex vert
             //定义片段着色器函数 frag
@@ -64,7 +63,7 @@ Shader "Unlit/fxc/frame"
             //-----------------纹理申明
             
             uniform sampler2D  _MainTexture;
-
+            
 
 
             //-------------------------------- vertciesArrayOut ——》 vertexShaderIn
@@ -116,56 +115,40 @@ Shader "Unlit/fxc/frame"
             //---------------------------fragmentShader
             float4 frag(v2f i):SV_Target
             {
+                //--------------------------------准备基本数据
                 //主要平行光方向
                 float3 lDirWS = normalize(_WorldSpaceLightPos0.xyz);
-
                 //主要平行光方向颜色
                 float3 lightColor = _LightColor0.rgb;
-
                 //ambient color
                 float3 ambient =  UNITY_LIGHTMODEL_AMBIENT.rgb;
-            
                 //片元位置 world space
                 float3 posWS = i.posWS.xyz;
-
-
-                //片元屏幕位置
-                float2 posScreenUV = i.pos.xy/ _ScreenParams.xy;
-
-                //片元Z深度 clip空间
-
-
+                //屏幕UV【0，1】
+                float2 ScreenUV = i.pos.xy/ _ScreenParams.xy;
+                //Z深度 ndc 空间[-1,1]
+                float zdepth = i.pos.w;
                 //片元顶点色
                 float4 vertexColor = i.color;
-
-                //世界法线方向
+                //法线方向 世界
                 float3 nDirWS =  normalize( i.nDirWS);
-
                 //切线方向 世界
                 float3 tDirWS = i.tDirWS;
-                
                 //副切线方向 世界
                 float3 biDirWS = normalize( cross(i.nDirWS,i.tDirWS) );
-
                 //UV0
                 float2 uv0 = i.uv0;
-                
                 //UV1
                 float2 uv1= i.uv1;
-
-
                 // 相机方向  世界
                 float3 vDirWS = normalize( (_WorldSpaceCameraPos.xyz - i.posWS) );
-
                 //灯光反射向量 世界
                 float3 rDirWS = normalize( reflect(-lDirWS,nDirWS) );
-
-
                 //影子
                 //float shadow = LIGHT_ATTENUATION(i);
 
 
-                //--------------------------------------------------------------
+                //------------------------------------计算--------------------------
            
                 
                 float3 fragmentOut = 1 ;
